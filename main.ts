@@ -1,9 +1,47 @@
-//Global Variables
-let hours   : number = 9;
-let minutes : number = 12;
+/*  Binary Clock
+    Uses the MicroBit leds to show a simple binary clock
+
+        0   1   2   3   4   <-- LED Columns
+        *   *   *   *  [*]  AM 
+        *   *   *   *  [*] 
+        *   *   *   #   * 
+        *   #   #   #  [#]  PM
+        #   *   #   #  [#] 
+        Hour    Minutes
+        Above is showing 12:37 PM
+        columns 0,1 --> hours
+        columns 2,3 --> minutes
+        column  4   --> AM (rows 0,1) or PM (rows 3,4)
+        New the first two leds in column rows 0&1 will rotes a second heartbeat
+
+    Uses:
+        arrays
+        control.millis()
+        input.onGesture
+        input.onButtonPressed
+        function
+*/
+
+// ******************************************
+//              Global Variables
+// ******************************************
+let hours   : number = 9;           // stores the hour value
+let minutes : number = 12;          // stores the minute value
+let seconds : number = 0;           // stores the second quadrant value
 let ampm    : boolean = true;       // is it AM?
-let adjust  : boolean = true;
+let adjust  : boolean = true;       // controls binary clock refresh - show everything
 let previousMillis : number = control.millis();
+let previousSecMillis : number = previousMillis;
+
+// ******************************************
+//               Global Arrays
+// ******************************************
+/*  hourhand[25][2][5] --> the first index  - the hour 0-24
+                           the second index - the led column 0-1
+                           the third index  - the leds within that column 0-4
+    so if you need the binary values for hour 12,
+    the first index item would be 12
+*/
 let hourHand : number[][][] =  [[[0,0,0,0,0],[0,0,0,0,0]], //00
                                 [[0,0,0,0,0],[0,0,0,0,1]], //01
                                 [[0,0,0,0,0],[0,0,0,1,0]], //02
@@ -30,6 +68,7 @@ let hourHand : number[][][] =  [[[0,0,0,0,0],[0,0,0,0,0]], //00
                                 [[0,0,0,1,0],[0,0,0,1,1]], //23
                                 [[0,0,0,1,0],[0,0,1,0,0]]]; //24
 
+//  minHand[60][2][5]
 let minHand : number[][][] =   [[[0,0,0,0,0],[0,0,0,0,0]], //00
                                 [[0,0,0,0,0],[0,0,0,0,1]], //01
                                 [[0,0,0,0,0],[0,0,0,1,0]], //02
@@ -91,71 +130,88 @@ let minHand : number[][][] =   [[[0,0,0,0,0],[0,0,0,0,0]], //00
                                 [[0,0,1,0,1],[0,1,0,0,0]], //58
                                 [[0,0,1,0,1],[0,1,0,0,1]]]; //59
 
+//  ampmHand[2][5]
 let ampmHand : number[][] =     [[1,1,0,0,0],[0,0,0,1,1]];  //AM, PM
 
+//  secondQuadrant[4][2][2]
+let secondQuadrant : number[][][] =   [[[1,0],[0,0]],
+                                        [[0,0],[1,0]],
+                                        [[0,0],[0,1]],
+                                        [[0,1],[0,0]]];
+
+
+// ******************************************
+//           Interrupt Routines
+// ******************************************
 input.onGesture(Gesture.Shake, () => {
+    //Shake the MicroBit to show time as a string
     let time : string = (hours.toString() + ":" + minutes.toString()+" ");
     if (ampm){ time += "AM"} else { time += "PM"}
     basic.clearScreen();
     basic.showString(time);
     basic.clearScreen();
-    pause(1000)
+    pause(1000);
     adjust = true;
 })
 
 input.onButtonPressed(Button.AB, () => {
+    //Adjusts the AM/PM value 
     ampm = !ampm;
     adjust = true;
 })
 
 input.onButtonPressed(Button.A, () => {
+    //Adjusts the hours
     if (hours < 23) {
         hours += 1;
     } else {
         hours = 0;
     }
     adjust = true;
-
 })
 
 input.onButtonPressed(Button.B, () => {
+    //Adjusts the minutes
     if (minutes < 59) {
         minutes += 1;
     } else {
         minutes = 0;
     }
     adjust = true;
-
 })
 
+// ******************************************
+//                functions
+// ******************************************
+
 function showHours():void {
-    // Show hours
-    for (let i=0; i < 2; i++){
-        for (let j=0; j < 5; j++){
-            if (hourHand[hours][i][j]==0){
-                led.unplot(i,j);
+    // Show hours - columns 0 & 1
+    for (let x=0; x < 2; x++){
+        for (let y=0; y < hourHand[hours][x].length; y++){
+            if (hourHand[hours][x][y]==0){
+                led.unplot(x,y);
             } else {
-                led.plot(i,j);
+                led.plot(x,y);
             }
         }
     }
 }
 
 function showMinutes():void {
-    // Show minutes
-    for (let i=0; i < 2; i++){
-        for (let j=0; j < 5; j++){
-            if (minHand[minutes][i][j]==0){
-                led.unplot(i+2,j);
+    // Show minutes - columns 2 & 3
+    for (let x=0; x < 2; x++){
+        for (let y=0; y < minHand[minutes][x].length; y++){
+            if (minHand[minutes][x][y]==0){
+                led.unplot(x+2,y);
             } else {
-                led.plot(i+2,j);
+                led.plot(x+2,y);
             }
         }
     }
 }
 
 function showAmPm():void{
-    //show AM or PM
+    //show AM or PM - column 4
     let x : number
     if (ampm){
         x = 0;
@@ -171,12 +227,24 @@ function showAmPm():void{
     } 
 }
 
+function showSeconds():void{
+    for (let x = 0; x < secondQuadrant[seconds].length; x++){
+        for (let y = 0; y < secondQuadrant[seconds][x].length; y++){
+            if (secondQuadrant[seconds][x][y]==0){
+                led.unplot(x,y)
+            } else {
+                led.plot(x,y)
+            }
+        }
+    }
+}
+
 function incrementTime(){
     if (minutes < 59) {
         minutes += 1;
     } else {
         minutes = 0;
-        // if (((hours<12)&&(!ampm)) || ((hours<24)&&(ampm))){  for future military time
+        //ToDo: military time
         if (hours < 12){
             hours += 1;
         } else {
@@ -189,17 +257,40 @@ function incrementTime(){
     showMinutes();
 }
 
-basic.clearScreen();
+function incrementSeconds(){
+    if (seconds < 3){
+        seconds +=1;
+    } else {
+        seconds = 0;
+    }
+    showSeconds();
+}
 
+// ******************************************
+//           Start - Run once
+// ******************************************
+basic.clearScreen();
+//End Start 
+
+// ******************************************
+//              forever Loop
+// ******************************************
 basic.forever(() => {
     if (adjust){
+        // Refresh the binary clock
         //Show hours
         showHours();
         //Show Minutes
         showMinutes();
         //Show AM or PM 
         showAmPm();
+        //show Seconds Quandrant
+        showSeconds()
         adjust = false;
+    }
+    if ((control.millis()-previousSecMillis) >= 1000){
+        previousSecMillis += 1000;
+        incrementSeconds()
     }
     if ((control.millis()-previousMillis) >= 60000) {
         previousMillis += 60000;
