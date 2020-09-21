@@ -4,7 +4,7 @@
         0   1   2   3   4   <-- LED Columns
         *   *   *   *  [*]  AM 
         *   *   *   *  [*] 
-        *   *   *   #   * 
+        *   *   *   #   *   <-- Military
         *   #   #   #  [#]  PM
         #   *   #   #  [#] 
         Hour    Minutes
@@ -12,10 +12,11 @@
         columns 0,1 --> hours
         columns 2,3 --> minutes
         column  4   --> AM (rows 0,1) or PM (rows 3,4)
-        New the first two leds in column rows 0&1 will rotes a second heartbeat
+        New the first row, columns 0-3 will note a second heartbeat
 
     Uses:
         arrays
+        enum
         control.millis()
         input.onGesture
         input.onButtonPressed
@@ -26,10 +27,17 @@
 //              Global Variables
 // ******************************************
 let hours   : number = 9;           // stores the hour value
+let maxHours: number = 12;          // stores the max number of hours before reset
 let minutes : number = 12;          // stores the minute value
 let seconds : number = 0;           // stores the second quadrant value
-let ampm    : boolean = true;       // is it AM?
+let time : string = ""
+let AM = 0;
+let PM = 1;
+let Military = 2;
+enum timeMoniker { AM, PM, Military }      //is it AM, PM or Military
+let ampm = timeMoniker.AM           //is it AM, PM or Military
 let adjust  : boolean = true;       // controls binary clock refresh - show everything
+let shaken  : boolean = false;      // controls time string display
 let previousMillis : number = control.millis();
 let previousSecMillis : number = previousMillis;
 
@@ -130,33 +138,54 @@ let minHand : number[][][] =   [[[0,0,0,0,0],[0,0,0,0,0]], //00
                                 [[0,0,1,0,1],[0,1,0,0,0]], //58
                                 [[0,0,1,0,1],[0,1,0,0,1]]]; //59
 
-//  ampmHand[2][5]
-let ampmHand : number[][] =     [[1,1,0,0,0],[0,0,0,1,1]];  //AM, PM
-
-//  secondQuadrant[4][2][2]
-let secondQuadrant : number[][][] =   [[[1,0],[0,0]],
-                                        [[0,0],[1,0]],
-                                        [[0,0],[0,1]],
-                                        [[0,1],[0,0]]];
-
+//  ampmHand[3][5]
+let ampmHand : number[][] =     [[1,1,0,0,0],[0,0,0,1,1],[0,0,1,0,0]];  //AM, PM, Military
 
 // ******************************************
 //           Interrupt Routines
 // ******************************************
 input.onGesture(Gesture.Shake, () => {
     //Shake the MicroBit to show time as a string
-    let time : string = (hours.toString() + ":" + minutes.toString()+" ");
-    if (ampm){ time += "AM"} else { time += "PM"}
-    basic.clearScreen();
-    basic.showString(time);
-    basic.clearScreen();
-    pause(1000);
-    adjust = true;
+    time = (hours.toString() + ":" + minutes.toString() + " ");
+    switch (ampm){
+        case AM:
+            time += "AM";
+            break;  
+        case PM:
+            time += "PM";
+            break;
+        case Military:
+            time += "hours";
+            break 
+        default:
+            //do nothing
+    }
+    shaken = true;
 })
 
 input.onButtonPressed(Button.AB, () => {
     //Adjusts the AM/PM value 
-    ampm = !ampm;
+    switch(ampm){
+        case AM:
+            //switch to PM
+            ampm = timeMoniker.PM;
+            if (hours > 12) { hours -= 12;}
+            maxHours = 12;
+            break;  
+        case PM:
+            //switch to Military 
+            ampm = timeMoniker.Military;
+            maxHours = 24;
+            break;
+        case Military:
+            //switch to AM 
+            ampm = timeMoniker.AM;
+            if (hours > 12) { hours -= 12;}
+            maxHours = 12;
+            break; 
+        default:
+          //do nothing
+    }
     adjust = true;
 })
 
@@ -211,12 +240,20 @@ function showMinutes():void {
 }
 
 function showAmPm():void{
-    //show AM or PM - column 4
+    //show AM, PM, or Military - on column 4
     let x : number
-    if (ampm){
-        x = 0;
-    } else {
-        x = 1;
+    switch (ampm){
+        case AM:
+            x = AM;
+            break;
+        case PM:
+            x = PM;
+            break; 
+        case Military:
+            x = Military;
+            break;
+        default:
+            //do nothing 
     }
     for (let i=0; i < ampmHand[0].length; i++){
         if (ampmHand[x][i]==0){
@@ -224,17 +261,16 @@ function showAmPm():void{
         } else {
             led.plot(4,i);
         }
-    } 
+    }
+ 
 }
 
 function showSeconds():void{
-    for (let x = 0; x < secondQuadrant[seconds].length; x++){
-        for (let y = 0; y < secondQuadrant[seconds][x].length; y++){
-            if (secondQuadrant[seconds][x][y]==0){
-                led.unplot(x,y)
-            } else {
-                led.plot(x,y)
-            }
+    for (let x = 0; x < 4; x++){
+        if (x == seconds){
+            led.plot(x, 0)
+        } else {
+            led.unplot(x, 0)
         }
     }
 }
@@ -245,11 +281,30 @@ function incrementTime(){
     } else {
         minutes = 0;
         //ToDo: military time
-        if (hours < 12){
-            hours += 1;
-        } else {
-            hours = 1;
-            ampm = !ampm
+        switch (ampm){
+            case AM: 
+            case PM: 
+                if (hours < 12){
+                    hours += 1;
+                } else {
+                    hours = 1;
+                    switch(ampm){
+                        case AM:
+                            ampm = timeMoniker.PM 
+                            break 
+                        case PM:
+                            ampm = timeMoniker.AM
+                    }
+                }
+            case Military: 
+                if (hours < 23){
+                    hours += 1;
+                } else {
+                    hours = 0;
+                }
+                break;
+            default:
+                // do nothing
         }
         showHours();
         showAmPm();
@@ -258,7 +313,7 @@ function incrementTime(){
 }
 
 function incrementSeconds(){
-    if (seconds < 3){
+    if (seconds < (4 -1)){
         seconds +=1;
     } else {
         seconds = 0;
@@ -287,6 +342,14 @@ basic.forever(() => {
         //show Seconds Quandrant
         showSeconds()
         adjust = false;
+    }
+    if (shaken){
+        basic.clearScreen();
+        basic.showString(time);
+        basic.clearScreen();
+        pause(1000);
+        shaken = false;
+        adjust = true;
     }
     if ((control.millis()-previousSecMillis) >= 1000){
         previousSecMillis += 1000;
