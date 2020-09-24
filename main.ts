@@ -1,18 +1,18 @@
 /*  Binary Clock
     Uses the MicroBit leds to show a simple binary clock
 
-        0   1   2   3   4   <-- LED Columns
-        *   *   *   *  [*]  AM 
-        *   *   *   *  [*] 
-        *   *   *   #   *   <-- Military
-        *   #   #   #  [#]  PM
-        #   *   #   #  [#] 
-        Hour    Minutes
+            0   1   2   3   4   <-- LED Columns
+        0   *   *   *   *  [*]  AM 
+        1   *   *   *   *  [*] 
+        2   *   *   *   #   *   <-- Military
+        3   *   #   #   #  [#]  PM
+        4   #   *   #   #  [#] 
+            Hour    Minutes
         Above is showing 12:37 PM
-        columns 0,1 --> hours
-        columns 2,3 --> minutes
+        columns 0,1 --> hours (read bottom up)
+        columns 2,3 --> minutes (read bottom up)
         column  4   --> AM (rows 0,1) or PM (rows 3,4)
-        New the first row, columns 0-3 will note a second heartbeat
+        row 0, columns 0-3 will note a second heartbeat
 
     Uses:
         arrays
@@ -26,18 +26,19 @@
 // ******************************************
 //              Global Variables
 // ******************************************
-let hours   : number = 9;           // stores the hour value
-let maxHours: number = 12;          // stores the max number of hours before reset
-let minutes : number = 12;          // stores the minute value
-let seconds : number = 0;           // stores the second quadrant value
-let time : string = ""
+let hours    : number = 9;            // stores the hour value
+let maxHours : number = 12;           // stores the max number of hours before reset
+let minHours : number = 1;            // stores the min number that hour can be 
+let minutes  : number = 12;           // stores the minute value
+let seconds  : number = 0;            // stores the second quadrant value
+let time     : string = ""
 let AM = 0;
 let PM = 1;
 let Military = 2;
-enum timeMoniker { AM, PM, Military }      //is it AM, PM or Military
-let ampm = timeMoniker.AM           //is it AM, PM or Military
-let adjust  : boolean = true;       // controls binary clock refresh - show everything
-let shaken  : boolean = false;      // controls time string display
+enum timeMoniker { AM, PM, Military } //is it AM, PM or Military
+let ampm = timeMoniker.AM             //is it AM, PM or Military
+let adjust   : boolean = true;        // controls binary clock refresh - show everything
+let shaken   : boolean = false;       // controls time string display
 let previousMillis : number = control.millis();
 let previousSecMillis : number = previousMillis;
 
@@ -45,9 +46,10 @@ let previousSecMillis : number = previousMillis;
 //               Global Arrays
 // ******************************************
 /*  binaryNumber[10][4] --> the first index  - the number 0-9
-                           the second index  - the leds within that column
+                           the second index  - the LEDs within that column
     so if you need the binary values for 1,
     the first index item would be 1
+    Note: we're only using four LEDs (1-4)
 */
 let binaryNumber : number[][] =  [[0,0,0,0], //0
                                   [0,0,0,1], //1
@@ -60,9 +62,10 @@ let binaryNumber : number[][] =  [[0,0,0,0], //0
                                   [1,0,0,0], //8
                                   [1,0,0,1]]; //9
 
-//  ampmHand[3][5]
+//  ampmHand[3][5] --> the first index - AM, PM or Military
+//                    the second index - the LEDs within that column
 let ampmHand : number[][] =     [[1,1,0,0,0],[0,0,0,1,1],[0,0,1,0,0]];  //AM, PM, Military
-let numberArray : number[] = [0,0];
+let numberArray : number[] = [0,0];  //used to store a number broken into single digits
 
 // ******************************************
 //           Interrupt Routines
@@ -94,17 +97,20 @@ input.onButtonPressed(Button.AB, () => {
             ampm = timeMoniker.PM;
             if (hours > 12) { hours -= 12;}
             maxHours = 12;
+            minHours = 1;
             break;  
         case PM:
             //switch to Military 
             ampm = timeMoniker.Military;
-            maxHours = 24;
+            maxHours = 23;
+            minHours = 0;
             break;
         case Military:
             //switch to AM 
             ampm = timeMoniker.AM;
             if (hours > 12) { hours -= 12;}
             maxHours = 12;
+            minHours = 1;
             break; 
         default:
           //do nothing
@@ -215,31 +221,21 @@ function incrementTime(){
         minutes += 1;
     } else {
         minutes = 0;
-        //ToDo: military time
-        switch (ampm){
-            case AM: 
-            case PM: 
-                if (hours < 12){
-                    hours += 1;
-                } else {
-                    hours = 1;
-                    switch(ampm){
-                        case AM:
-                            ampm = timeMoniker.PM 
-                            break 
-                        case PM:
-                            ampm = timeMoniker.AM
-                    }
-                }
-            case Military: 
-                if (hours < 23){
-                    hours += 1;
-                } else {
-                    hours = 0;
-                }
-                break;
-            default:
-                // do nothing
+        // Handle hour increment based in AM, PM, or Military Time
+        if (hours < maxHours){
+            hours += 1;
+        } else {
+            hours = minHours;
+            switch(ampm){
+                case AM:
+                    ampm = timeMoniker.PM;
+                    break;
+                case PM:
+                    ampm = timeMoniker.AM;
+                    break;
+                default:
+                    // Military time do nothing
+            }
         }
         showHours();
         showAmPm();
@@ -285,6 +281,7 @@ basic.forever(() => {
         pause(1000);
         shaken = false;
         adjust = true;
+        previousSecMillis = control.millis()  //to prevent heartbeat after showString
     }
     if ((control.millis()-previousSecMillis) >= 1000){
         previousSecMillis += 1000;
