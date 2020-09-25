@@ -72,7 +72,14 @@ let numberArray : number[] = [0,0];  //used to store a number broken into single
 // ******************************************
 input.onGesture(Gesture.Shake, () => {
     //Shake the MicroBit to show time as a string
-    time = (hours.toString() + ":" + minutes.toString() + " ");
+    if (ampm == Military){
+        let isOk = fillNumArray(hours);
+        time = numberArray[0].toString() + numberArray[1].toString();
+    } else {
+        time = hours.toString() + ":";    
+    }
+    let isOk = fillNumArray(minutes);
+    time = (time + numberArray[0].toString() + numberArray[1].toString() + " ");
     switch (ampm){
         case AM:
             time += "AM";
@@ -120,10 +127,10 @@ input.onButtonPressed(Button.AB, () => {
 
 input.onButtonPressed(Button.A, () => {
     //Adjusts the hours
-    if (hours < 23) {
+    if (hours < maxHours) {
         hours += 1;
     } else {
-        hours = 0;
+        hours = minHours;
     }
     adjust = true;
 })
@@ -224,18 +231,20 @@ function incrementTime(){
         // Handle hour increment based in AM, PM, or Military Time
         if (hours < maxHours){
             hours += 1;
+            if (hours = 12){
+                switch(ampm){
+                    case AM:
+                        ampm = timeMoniker.PM;
+                        break;
+                    case PM:
+                        ampm = timeMoniker.AM;
+                        break;
+                    default:
+                        // Military time do nothing
+                }
+            }
         } else {
             hours = minHours;
-            switch(ampm){
-                case AM:
-                    ampm = timeMoniker.PM;
-                    break;
-                case PM:
-                    ampm = timeMoniker.AM;
-                    break;
-                default:
-                    // Military time do nothing
-            }
         }
         showHours();
         showAmPm();
