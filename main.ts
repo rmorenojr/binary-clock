@@ -231,7 +231,7 @@ function incrementTime(){
         // Handle hour increment based in AM, PM, or Military Time
         if (hours < maxHours){
             hours += 1;
-            if (hours = 12){
+            if (hours == 12){
                 switch(ampm){
                     case AM:
                         ampm = timeMoniker.PM;
@@ -253,7 +253,7 @@ function incrementTime(){
 }
 
 function incrementSeconds(){
-    if (seconds < (4 -1)){
+    if (seconds < (4 - 1)){
         seconds +=1;
     } else {
         seconds = 0;
