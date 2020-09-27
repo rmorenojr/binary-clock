@@ -22,6 +22,10 @@
         input.onButtonPressed
         function
 */
+// ******************************************
+//              Revision
+// ******************************************
+// 09/27/2020 - Changed enum values to constants, made Function builsString, additional comments 
 
 // ******************************************
 //              Global Variables
@@ -31,14 +35,14 @@ let maxHours : number = 12;           // stores the max number of hours before r
 let minHours : number = 1;            // stores the min number that hour can be 
 let minutes  : number = 12;           // stores the minute value
 let seconds  : number = 0;            // stores the second quadrant value
-let time     : string = ""
-let AM = 0;
-let PM = 1;
-let Military = 2;
-enum timeMoniker { AM, PM, Military } //is it AM, PM or Military
-let ampm = timeMoniker.AM             //is it AM, PM or Military
-let adjust   : boolean = true;        // controls binary clock refresh - show everything
-let shaken   : boolean = false;       // controls time string display
+let time     : string = "";
+const AM = 0;
+const PM = 1;
+const Military = 2;
+enum timeMoniker { AM, PM, Military } // is it AM, PM or Military
+let ampm = timeMoniker.AM;             // is it AM, PM or Military
+let adjust   : boolean = true;        // triggers binary clock refresh - show everything
+let shaken   : boolean = false;       // triggers time string display
 let previousMillis : number = control.millis();
 let previousSecMillis : number = previousMillis;
 
@@ -62,37 +66,25 @@ let binaryNumber : number[][] =  [[0,0,0,0], //0
                                   [1,0,0,0], //8
                                   [1,0,0,1]]; //9
 
-//  ampmHand[3][5] --> the first index - AM, PM or Military
-//                    the second index - the LEDs within that column
+/*  ampmHand[3][5] --> the first index - AM, PM or Military
+                      the second index - the LEDs within that column
+*/                      
 let ampmHand : number[][] =     [[1,1,0,0,0],[0,0,0,1,1],[0,0,1,0,0]];  //AM, PM, Military
-let numberArray : number[] = [0,0];  //used to store a number broken into single digits
+
+/*  numberArray[] --> 0 index = tens place digit (left digit)
+                      1 index = ones place digit (right digit) 
+    Basically numberArray is used to store a number broken into individual single digits
+    so 12 would be numberArray = [1,2]
+    used/updated by fillNumArray            
+*/
+let numberArray : number[] = [0,0];  
 
 // ******************************************
 //           Interrupt Routines
 // ******************************************
 input.onGesture(Gesture.Shake, () => {
-    //Shake the MicroBit to show time as a string
-    if (ampm == Military){
-        let isOk = fillNumArray(hours);
-        time = numberArray[0].toString() + numberArray[1].toString();
-    } else {
-        time = hours.toString() + ":";    
-    }
-    let isOk = fillNumArray(minutes);
-    time = (time + numberArray[0].toString() + numberArray[1].toString() + " ");
-    switch (ampm){
-        case AM:
-            time += "AM";
-            break;  
-        case PM:
-            time += "PM";
-            break;
-        case Military:
-            time += "hours";
-            break 
-        default:
-            //do nothing
-    }
+    // Set the shaken boolean
+    // Shake the MicroBit to show time as a string
     shaken = true;
 })
 
@@ -150,6 +142,7 @@ input.onButtonPressed(Button.B, () => {
 // ******************************************
 
 function fillNumArray(numValue:number) : boolean{
+    //ToDo:  check if something fails
     numberArray[0] = Math.floor(numValue / 10);
     numberArray[1] = (numValue % 10);
     return true;
@@ -261,6 +254,33 @@ function incrementSeconds(){
     showSeconds();
 }
 
+function buildString() : string{
+    // Let's build the string:
+    let stringValue : string = ""
+    if (ampm == Military){
+        let isOk = fillNumArray(hours);
+        stringValue = numberArray[0].toString() + numberArray[1].toString();
+    } else {
+        stringValue = hours.toString() + ":";    
+    }
+    let isOk = fillNumArray(minutes);
+    stringValue = (stringValue + numberArray[0].toString() + numberArray[1].toString());
+    switch (ampm){
+        case AM:
+            stringValue += "AM";
+            break;  
+        case PM:
+            stringValue += "PM";
+            break;
+        case Military:
+            stringValue += "hours";
+            break 
+        default:
+            //do nothing
+    }
+    return stringValue;
+}
+
 // ******************************************
 //           Start - Run once
 // ******************************************
@@ -280,25 +300,27 @@ basic.forever(() => {
         //Show AM or PM 
         showAmPm();
         //show Seconds Quandrant
-        showSeconds()
+        showSeconds();
         adjust = false;
     }
     if (shaken){
+        time = buildString();
         basic.clearScreen();
         basic.showString(time);
         basic.clearScreen();
-        pause(1000);
+        pause(500);
         shaken = false;
-        adjust = true;
-        previousSecMillis = control.millis()  //to prevent heartbeat after showString
+        adjust = true;  //to refresh the binary clock 
+        previousSecMillis = control.millis();  //to prevent heartbeat after showString
     }
     if ((control.millis()-previousSecMillis) >= 1000){
+        //Shows the second heartbeat
         previousSecMillis += 1000;
-        incrementSeconds()
+        incrementSeconds();
     }
     if ((control.millis()-previousMillis) >= 60000) {
         previousMillis += 60000;
-        incrementTime()
+        incrementTime();
     }
 })
 
